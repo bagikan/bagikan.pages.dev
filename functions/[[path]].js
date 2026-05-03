@@ -27,28 +27,17 @@ export async function onRequest(context) {
     // SITEMAP
     // ======================
     if (path === "/sitemap.xml") {
-
       const items = data.map(item => {
         let s = item.slug || item.id;
-
         if (typeof s === "string") {
           s = s.toLowerCase().replace(/\s+/g, "-");
         }
-
-        return `
-          <url>
-            <loc>${DOMAIN}/artikel/${s}</loc>
-            <priority>0.8</priority>
-          </url>
-        `;
+        return `<url><loc>${DOMAIN}/artikel/${s}</loc></url>`;
       }).join("");
 
       return new Response(`<?xml version="1.0" encoding="UTF-8"?>
       <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-        <url>
-          <loc>${DOMAIN}/</loc>
-          <priority>1.0</priority>
-        </url>
+        <url><loc>${DOMAIN}/</loc></url>
         ${items}
       </urlset>`, {
         headers: { "content-type": "application/xml" },
@@ -56,7 +45,7 @@ export async function onRequest(context) {
     }
 
     // ======================
-    // HOMEPAGE GRID
+    // HOMEPAGE
     // ======================
     if (!slug) {
 
@@ -64,18 +53,15 @@ export async function onRequest(context) {
 
       data.forEach(item => {
         let s = item.slug || item.id;
-
         if (typeof s === "string") {
           s = s.toLowerCase().replace(/\s+/g, "-");
         }
 
         const title = item.title || "Artikel";
         const desc = (item.meta_description || "").substring(0, 120);
-        const image = item.image || "https://via.placeholder.com/400x200";
 
         cards += `
           <a href="/artikel/${s}" class="card">
-            <img src="${image}">
             <h2>${title}</h2>
             <p>${desc}</p>
           </a>
@@ -86,7 +72,11 @@ export async function onRequest(context) {
       <html>
       <head>
         <title>Blog Artikel</title>
+
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="Kumpulan artikel terbaru">
+        <meta name="robots" content="index, follow">
 
         <style>
           body {margin:0;font-family:sans-serif;background:#f5f5f5;}
@@ -105,7 +95,6 @@ export async function onRequest(context) {
             color:#000;
             box-shadow:0 5px 15px rgba(0,0,0,0.05);
           }
-          .card img {width:100%;border-radius:8px;}
         </style>
       </head>
 
@@ -131,11 +120,9 @@ export async function onRequest(context) {
     // ======================
     const artikel = data.find(item => {
       let s = item.slug || item.id;
-
       if (typeof s === "string") {
         s = s.toLowerCase().replace(/\s+/g, "-");
       }
-
       return s == slug;
     });
 
@@ -147,33 +134,80 @@ export async function onRequest(context) {
     const content = artikel.content || "<p>Tidak ada konten</p>";
     const desc = artikel.meta_description || content.substring(0, 140);
 
+    const fullUrl = `${DOMAIN}/artikel/${slug}`;
+
     // ======================
-    // RELATED SIMPLE FIX
+    // RELATED
     // ======================
     let related = "<h3>Artikel Terkait</h3><ul>";
 
     data.slice(0,5).forEach(item => {
-
       let s = item.slug || item.id;
-
       if (typeof s === "string") {
         s = s.toLowerCase().replace(/\s+/g, "-");
       }
-
       related += `<li><a href="/artikel/${s}">${item.title || "Artikel"}</a></li>`;
     });
 
     related += "</ul>";
 
+    // ======================
+    // JSON-LD
+    // ======================
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": title,
+      "description": desc,
+      "mainEntityOfPage": fullUrl,
+      "author": {
+        "@type": "Person",
+        "name": "Admin"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Website Kamu"
+      }
+    };
+
     return new Response(`
     <html>
     <head>
       <title>${title}</title>
+
+      <!-- BASIC -->
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="description" content="${desc}">
+      <meta name="robots" content="index, follow">
+      <link rel="canonical" href="${fullUrl}">
+
+      <!-- OPEN GRAPH -->
+      <meta property="og:title" content="${title}">
+      <meta property="og:description" content="${desc}">
+      <meta property="og:url" content="${fullUrl}">
+      <meta property="og:type" content="article">
+
+      <!-- TWITTER -->
+      <meta name="twitter:card" content="summary">
+      <meta name="twitter:title" content="${title}">
+      <meta name="twitter:description" content="${desc}">
+
+      <!-- JSON-LD -->
+      <script type="application/ld+json">
+        ${JSON.stringify(jsonLd)}
+      </script>
+
+      <style>
+        body {font-family:sans-serif;max-width:800px;margin:auto;padding:20px;}
+        h1 {font-size:28px;}
+        p {line-height:1.6;}
+      </style>
     </head>
 
     <body>
       <h1>${title}</h1>
+      <p><i>${desc}</i></p>
 
       ${content}
 
