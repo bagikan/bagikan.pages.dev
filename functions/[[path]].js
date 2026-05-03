@@ -1,64 +1,71 @@
-export default {
-  async fetch(request) {
+export async function onRequest(context) {
+  try {
+    const url = new URL(context.request.url);
+    const path = url.pathname;
+
+    const API_URL = "https://script.google.com/macros/s/AKfycbxXpn0lB80LpLRaJHKBI5wgLjnyGLU-gXC3qTo-MxXBuJlHbTZ10ORuFdnDRl1LB2y5/exec";
+
+    // ambil slug
+    const match = path.match(/^\/artikel\/(.+)$/);
+    const slug = match ? match[1] : null;
+
+    // fetch API
+    const res = await fetch(API_URL);
+    const text = await res.text();
+
+    let data;
     try {
-      const url = new URL(request.url);
-      const path = url.pathname;
+      data = JSON.parse(text);
+    } catch {
+      return new Response("❌ API bukan JSON:\n\n" + text);
+    }
 
-      const API_URL = "https://script.google.com/macros/s/AKfycbxXpn0lB80LpLRaJHKBI5wgLjnyGLU-gXC3qTo-MxXBuJlHbTZ10ORuFdnDRl1LB2y5/exec";
+    // kalau data kosong
+    if (!data || data.length === 0) {
+      return new Response("❌ DATA KOSONG dari Google Sheets");
+    }
 
-      // ambil slug
-      const match = path.match(/^\/artikel\/(.+)$/);
-      const slug = match ? match[1] : null;
+    // ======================
+    // HOMEPAGE
+    // ======================
+    if (!slug) {
+      let html = `<h1>Daftar Artikel</h1><ul>`;
 
-      // ambil data
-      const res = await fetch(API_URL);
-      const text = await res.text();
+      data.forEach(item => {
+        const s = item.slug || item.id;
+        html += `<li><a href="/artikel/${s}">${item.title || "No title"}</a></li>`;
+      });
 
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        return new Response("Bukan JSON:\n" + text);
-      }
+      html += `</ul>`;
 
-      // ======================
-      // 🏠 HOMEPAGE
-      // ======================
-      if (!slug) {
-        let html = `<h1>Daftar Artikel</h1><ul>`;
+      return new Response(html, {
+        headers: { "content-type": "text/html" },
+      });
+    }
 
-        data.forEach(item => {
-          const s = item.slug || item.id;
-          html += `<li><a href="/artikel/${s}">${item.title}</a></li>`;
-        });
+    // ======================
+    // CARI ARTIKEL
+    // ======================
+    const artikel = data.find(item =>
+      (item.slug && item.slug == slug) ||
+      (item.id && item.id == slug)
+    );
 
-        html += `</ul>`;
-
-        return new Response(html, {
-          headers: { "content-type": "text/html" },
-        });
-      }
-
-      // ======================
-      // 🔍 CARI ARTIKEL
-      // ======================
-      const artikel = data.find(item =>
-        (item.slug && item.slug == slug) ||
-        (item.id && item.id == slug)
+    if (!artikel) {
+      return new Response(
+        "❌ ARTIKEL TIDAK DITEMUKAN\n\nSlug: " + slug +
+        "\n\nData:\n" + JSON.stringify(data, null, 2)
       );
+    }
 
-      if (!artikel) {
-        return new Response("Artikel tidak ditemukan", { status: 404 });
-      }
+    // ======================
+    // META MINIMAL
+    // ======================
+    const title = artikel.title || "Artikel";
+    const content = artikel.content || "";
+    const desc = artikel.meta_description || content.substring(0, 160);
 
-      // ======================
-      // 🔥 META MINIMAL
-      // ======================
-      const title = artikel.title || "Artikel";
-      const content = artikel.content || "";
-      const desc = artikel.meta_description || content.substring(0, 160);
-
-      return new Response(`
+    return new Response(`
 <html>
 <head>
   <title>${title}</title>
@@ -73,12 +80,11 @@ export default {
   <br><a href="/">← Kembali</a>
 </body>
 </html>
-      `, {
-        headers: { "content-type": "text/html;charset=UTF-8" },
-      });
+    `, {
+      headers: { "content-type": "text/html;charset=UTF-8" },
+    });
 
-    } catch (err) {
-      return new Response("ERROR:\n" + err.toString());
-    }
-  },
-};
+  } catch (err) {
+    return new Response("❌ ERROR:\n" + err.toString());
+  }
+}
