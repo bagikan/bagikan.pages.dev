@@ -6,12 +6,11 @@ export async function onRequest(context) {
     const API_URL = "https://script.google.com/macros/s/AKfycbxXpn0lB80LpLRaJHKBI5wgLjnyGLU-gXC3qTo-MxXBuJlHbTZ10ORuFdnDRl1LB2y5/exec";
     const DOMAIN = url.origin;
 
-    // ambil slug
     const match = path.match(/^\/artikel\/(.+)$/);
     const slug = match ? match[1] : null;
 
     // ======================
-    // 🔥 FETCH DATA (WAJIB DI ATAS)
+    // FETCH DATA
     // ======================
     const res = await fetch(API_URL);
     const text = await res.text();
@@ -19,132 +18,175 @@ export async function onRequest(context) {
     let data;
     try {
       data = JSON.parse(text);
+      if (!Array.isArray(data)) data = [];
     } catch {
       return new Response("Bukan JSON:\n" + text);
     }
 
     // ======================
-    // 🗺️ SITEMAP.XML
+    // SITEMAP
     // ======================
     if (path === "/sitemap.xml") {
+
       const items = data.map(item => {
-        const s = item.slug || item.id;
+        let s = item.slug || item.id;
+
+        if (typeof s === "string") {
+          s = s.toLowerCase().replace(/\s+/g, "-");
+        }
+
         return `
           <url>
             <loc>${DOMAIN}/artikel/${s}</loc>
-            <changefreq>daily</changefreq>
             <priority>0.8</priority>
           </url>
         `;
       }).join("");
 
-      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      return new Response(`<?xml version="1.0" encoding="UTF-8"?>
       <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
         <url>
           <loc>${DOMAIN}/</loc>
-          <changefreq>daily</changefreq>
           <priority>1.0</priority>
         </url>
         ${items}
-      </urlset>`;
-
-      return new Response(xml, {
+      </urlset>`, {
         headers: { "content-type": "application/xml" },
       });
     }
 
     // ======================
-    // 🏠 HOMEPAGE
+    // HOMEPAGE GRID
     // ======================
     if (!slug) {
-      let html = `<h1>Daftar Artikel</h1><ul>`;
+
+      let cards = "";
 
       data.forEach(item => {
-        const s = item.slug || item.id;
-        html += `<li><a href="/artikel/${s}">${item.title}</a></li>`;
+        let s = item.slug || item.id;
+
+        if (typeof s === "string") {
+          s = s.toLowerCase().replace(/\s+/g, "-");
+        }
+
+        const title = item.title || "Artikel";
+        const desc = (item.meta_description || "").substring(0, 120);
+        const image = item.image || "https://via.placeholder.com/400x200";
+
+        cards += `
+          <a href="/artikel/${s}" class="card">
+            <img src="${image}">
+            <h2>${title}</h2>
+            <p>${desc}</p>
+          </a>
+        `;
       });
 
-      html += `</ul>`;
+      return new Response(`
+      <html>
+      <head>
+        <title>Blog Artikel</title>
+        <meta name="description" content="Kumpulan artikel terbaru">
 
-      return new Response(html, {
+        <style>
+          body {margin:0;font-family:sans-serif;background:#f5f5f5;}
+          header {background:#111;color:#fff;padding:20px;text-align:center;}
+          .container {max-width:1100px;margin:auto;padding:20px;}
+          .grid {
+            display:grid;
+            grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+            gap:20px;
+          }
+          .card {
+            background:#fff;
+            border-radius:10px;
+            padding:15px;
+            text-decoration:none;
+            color:#000;
+            box-shadow:0 5px 15px rgba(0,0,0,0.05);
+          }
+          .card img {width:100%;border-radius:8px;}
+        </style>
+      </head>
+
+      <body>
+        <header>
+          <h1>Blog Artikel</h1>
+        </header>
+
+        <div class="container">
+          <div class="grid">
+            ${cards}
+          </div>
+        </div>
+      </body>
+      </html>
+      `, {
         headers: { "content-type": "text/html;charset=UTF-8" },
       });
     }
 
     // ======================
-    // 🔍 CARI ARTIKEL
+    // ARTIKEL
     // ======================
-    const artikel = data.find(item =>
-      (item.slug && item.slug == slug) ||
-      (item.id && item.id == slug)
-    );
+    const artikel = data.find(item => {
+      let s = item.slug || item.id;
+
+      if (typeof s === "string") {
+        s = s.toLowerCase().replace(/\s+/g, "-");
+      }
+
+      return s == slug;
+    });
 
     if (!artikel) {
       return new Response("Not found", { status: 404 });
     }
 
-    // ======================
-    // 🔥 DATA
-    // ======================
     const title = artikel.title || "Artikel";
-    const content = artikel.content || "";
-    const desc = artikel.meta_description || content.substring(0, 150);
-    const image = artikel.image || "https://via.placeholder.com/1200x630";
-    const fullUrl = `${DOMAIN}/artikel/${slug}`;
+    const content = artikel.content || "<p>Tidak ada konten</p>";
+    const desc = artikel.meta_description || content.substring(0, 140);
 
     // ======================
-    // 🔥 JSON-LD
+    // RELATED SIMPLE FIX
     // ======================
-    const jsonLd = {
-      "@context": "https://schema.org",
-      "@type": "Article",
-      "headline": title,
-      "description": desc,
-      "image": image,
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": fullUrl
+    let related = "<h3>Artikel Terkait</h3><ul>";
+
+    data.slice(0,5).forEach(item => {
+
+      let s = item.slug || item.id;
+
+      if (typeof s === "string") {
+        s = s.toLowerCase().replace(/\s+/g, "-");
       }
-    };
 
-    // ======================
-    // 🌐 OUTPUT HTML
-    // ======================
+      related += `<li><a href="/artikel/${s}">${item.title || "Artikel"}</a></li>`;
+    });
+
+    related += "</ul>";
+
     return new Response(`
-      <html>
-      <head>
-        <title>${title}</title>
+    <html>
+    <head>
+      <title>${title}</title>
+      <meta name="description" content="${desc}">
+    </head>
 
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="description" content="${desc}">
-        <meta name="robots" content="index, follow">
-        <link rel="canonical" href="${fullUrl}">
+    <body>
+      <h1>${title}</h1>
 
-        <!-- OPEN GRAPH -->
-        <meta property="og:type" content="article">
-        <meta property="og:title" content="${title}">
-        <meta property="og:description" content="${desc}">
-        <meta property="og:url" content="${fullUrl}">
-        <meta property="og:image" content="${image}">
+      ${content}
 
-        <!-- JSON-LD -->
-        <script type="application/ld+json">
-          ${JSON.stringify(jsonLd)}
-        </script>
-      </head>
+      ${related}
 
-      <body>
-        <h1>${title}</h1>
-        <p>${content}</p>
-        <br><a href="/">← Kembali</a>
-      </body>
-      </html>
+      <br><a href="/">← Kembali</a>
+    </body>
+    </html>
     `, {
       headers: { "content-type": "text/html;charset=UTF-8" },
     });
 
   } catch (err) {
-    return new Response("Error:\n" + err.toString());
+    return new Response("ERROR:\n" + err.toString());
   }
 }
