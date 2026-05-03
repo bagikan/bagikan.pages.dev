@@ -30,7 +30,6 @@ export async function onRequest(context) {
     // SITEMAP
     // ======================
     if (path === "/sitemap.xml") {
-
       const items = data.map(item => {
         let s = (item.slug || item.id || "")
           .toString()
@@ -40,26 +39,24 @@ export async function onRequest(context) {
         return `<url><loc>${DOMAIN}/artikel/${s}</loc></url>`;
       }).join("");
 
-      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      return new Response(`<?xml version="1.0" encoding="UTF-8"?>
       <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
         <url><loc>${DOMAIN}/</loc></url>
         ${items}
-      </urlset>`;
-
-      return new Response(xml, {
+      </urlset>`, {
         headers: { "content-type": "application/xml" },
       });
     }
 
     // ======================
-    // HOMEPAGE AMP + PAGINATION
+    // HOMEPAGE (GRID + PAGINATION)
     // ======================
     if (!slug) {
 
       const start = (page - 1) * perPage;
       const paginated = data.slice(start, start + perPage);
 
-      let items = "";
+      let cards = "";
 
       paginated.forEach(item => {
         let s = (item.slug || item.id || "")
@@ -68,26 +65,18 @@ export async function onRequest(context) {
           .replace(/\s+/g, "-");
 
         const title = item.title || "Artikel";
-        const desc = (item.meta_description || "").substring(0, 100);
+        const desc = (item.meta_description || "").substring(0, 120);
 
         const image = item.image && item.image.trim() !== ""
           ? item.image
           : "/default.png";
 
-        items += `
-          <div class="card">
-            <a href="/artikel/${s}">
-              <amp-img 
-                src="${image}" 
-                width="400" 
-                height="200" 
-                layout="responsive"
-                alt="${title}">
-              </amp-img>
-              <h2>${title}</h2>
-              <p>${desc}</p>
-            </a>
-          </div>
+        cards += `
+          <a href="/artikel/${s}" class="card">
+            <img src="${image}" alt="${title}" loading="lazy">
+            <h2>${title}</h2>
+            <p>${desc}</p>
+          </a>
         `;
       });
 
@@ -95,75 +84,68 @@ export async function onRequest(context) {
 
       let pagination = `<div class="pagination">`;
       for (let i = 1; i <= totalPages; i++) {
-        pagination += `<a href="/?page=${i}" ${i === page ? 'style="font-weight:bold"' : ''}>${i}</a>`;
+        pagination += `<a href="/?page=${i}" class="${i === page ? 'active' : ''}">${i}</a>`;
       }
       pagination += `</div>`;
 
-      const jsonLd = {
-        "@context": "https://schema.org",
-        "@type": "CollectionPage",
-        "name": "Blog AMP",
-        "url": `${DOMAIN}/?page=${page}`
-      };
-
       return new Response(`
-<!doctype html>
-<html amp>
-<head>
-  <meta charset="utf-8">
-  <title>Blog AMP - Page ${page}</title>
+      <html>
+      <head>
+        <title>Blog Artikel - Page ${page}</title>
 
-  <link rel="canonical" href="${DOMAIN}/?page=${page}">
-  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <meta name="viewport" content="width=device-width,minimum-scale=1">
-  <meta name="description" content="Kumpulan artikel terbaru halaman ${page}">
-  <meta name="robots" content="index, follow">
+        <meta name="description" content="Kumpulan artikel terbaru halaman ${page}">
+        <meta name="robots" content="index, follow">
 
-  <!-- OG -->
-  <meta property="og:title" content="Blog AMP - Page ${page}">
-  <meta property="og:description" content="Kumpulan artikel terbaru halaman ${page}">
-  <meta property="og:url" content="${DOMAIN}/?page=${page}">
-  <meta property="og:type" content="website">
+        <link rel="canonical" href="https://acc.injector.workers.dev/?page=${page}">
+        <link rel="sitemap" href="/sitemap.xml">
 
-  <!-- AMP -->
-  <script async src="https://cdn.ampproject.org/v0.js"></script>
+        <!-- OG -->
+        <meta property="og:title" content="Blog Artikel - Page ${page}">
+        <meta property="og:description" content="Kumpulan artikel terbaru halaman ${page}">
+        <meta property="og:type" content="website">
 
-  <style amp-boilerplate>body{visibility:hidden}</style>
-  <noscript><style amp-boilerplate>body{visibility:visible}</style></noscript>
+        <style>
+          body {margin:0;font-family:sans-serif;background:#f5f5f5;}
+          header {background:#111;color:#fff;padding:20px;text-align:center;}
+          .container {max-width:1100px;margin:auto;padding:20px;}
+          .grid {
+            display:grid;
+            grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+            gap:20px;
+          }
+          .card {
+            background:#fff;
+            border-radius:10px;
+            padding:15px;
+            text-decoration:none;
+            color:#000;
+          }
+          .card img {width:100%;border-radius:8px;}
+          .pagination {text-align:center;margin-top:20px;}
+          .pagination a {margin:5px;text-decoration:none;}
+          .active {font-weight:bold;}
+        </style>
+      </head>
 
-  <style amp-custom>
-    body{font-family:sans-serif;background:#f5f5f5;padding:10px;}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-    .card{background:#fff;padding:10px;border-radius:8px;}
-    h2{font-size:16px;}
-    .pagination{text-align:center;margin-top:20px;}
-  </style>
+      <body>
+        <header><h1>Blog Artikel</h1></header>
 
-  <script type="application/ld+json">
-    ${JSON.stringify(jsonLd)}
-  </script>
-</head>
-
-<body>
-
-<h1>Blog AMP</h1>
-
-<div class="grid">
-  ${items}
-</div>
-
-${pagination}
-
-</body>
-</html>
+        <div class="container">
+          <div class="grid">${cards}</div>
+          ${pagination}
+        </div>
+      </body>
+      </html>
       `, {
         headers: { "content-type": "text/html;charset=UTF-8" },
       });
     }
 
     // ======================
-    // ARTIKEL AMP
+    // ARTIKEL
     // ======================
     const artikel = data.find(item => {
       let s = (item.slug || item.id || "")
@@ -185,6 +167,7 @@ ${pagination}
       ? artikel.image
       : "/default.png";
 
+    // 🔥 tetap pakai workers sebagai canonical utama
     const fullUrl = `https://acc.injector.workers.dev/artikel/${slug}`;
 
     const jsonLd = {
@@ -193,80 +176,53 @@ ${pagination}
       "headline": title,
       "description": desc,
       "image": image,
-      "mainEntityOfPage": fullUrl,
-      "author": {
-        "@type": "Person",
-        "name": "Admin"
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "Website Kamu"
-      }
+      "mainEntityOfPage": fullUrl
     };
 
     return new Response(`
-<!doctype html>
-<html amp>
-<head>
-  <meta charset="utf-8">
-  <title>${title}</title>
+    <html>
+    <head>
+      <title>${title}</title>
 
-  <link rel="canonical" href="${fullUrl}">
-  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <meta name="viewport" content="width=device-width,minimum-scale=1">
-  <meta name="description" content="${desc}">
-  <meta name="robots" content="index, follow">
+      <meta name="description" content="${desc}">
+      <meta name="robots" content="index, follow">
 
-  <!-- OG -->
-  <meta property="og:title" content="${title}">
-  <meta property="og:description" content="${desc}">
-  <meta property="og:image" content="${image}">
-  <meta property="og:type" content="article">
+      <link rel="canonical" href="${fullUrl}">
+      <link rel="sitemap" href="/sitemap.xml">
 
-  <!-- TWITTER -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${title}">
-  <meta name="twitter:description" content="${desc}">
-  <meta name="twitter:image" content="${image}">
+      <!-- OG -->
+      <meta property="og:title" content="${title}">
+      <meta property="og:description" content="${desc}">
+      <meta property="og:image" content="${image}">
+      <meta property="og:type" content="article">
 
-  <!-- AMP -->
-  <script async src="https://cdn.ampproject.org/v0.js"></script>
+      <!-- JSON -->
+      <script type="application/ld+json">
+        ${JSON.stringify(jsonLd)}
+      </script>
 
-  <style amp-boilerplate>body{visibility:hidden}</style>
-  <noscript><style amp-boilerplate>body{visibility:visible}</style></noscript>
+      <style>
+        body {font-family:sans-serif;max-width:800px;margin:auto;padding:20px;}
+        img {width:100%;border-radius:10px;}
+      </style>
+    </head>
 
-  <style amp-custom>
-    body{font-family:sans-serif;padding:15px;}
-    h1{font-size:22px;}
-    p{line-height:1.6;}
-  </style>
+    <body>
 
-  <script type="application/ld+json">
-    ${JSON.stringify(jsonLd)}
-  </script>
-</head>
+      <img src="${image}" alt="${title}" loading="lazy">
 
-<body>
+      <h1>${title}</h1>
+      <p><i>${desc}</i></p>
 
-<h1>${title}</h1>
+      ${content}
 
-<amp-img 
-  src="${image}" 
-  width="800" 
-  height="400" 
-  layout="responsive"
-  alt="${title}">
-</amp-img>
+      <br><a href="/">← Kembali</a>
 
-<p>${desc}</p>
-
-${content}
-
-<br><a href="${fullUrl}">Versi Normal</a>
-
-</body>
-</html>
+    </body>
+    </html>
     `, {
       headers: { "content-type": "text/html;charset=UTF-8" },
     });
