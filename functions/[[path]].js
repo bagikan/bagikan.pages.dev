@@ -27,7 +27,32 @@ export async function onRequest(context) {
     }
 
     // ======================
-    // HOMEPAGE AMP + META
+    // SITEMAP
+    // ======================
+    if (path === "/sitemap.xml") {
+
+      const items = data.map(item => {
+        let s = (item.slug || item.id || "")
+          .toString()
+          .toLowerCase()
+          .replace(/\s+/g, "-");
+
+        return `<url><loc>${DOMAIN}/artikel/${s}</loc></url>`;
+      }).join("");
+
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <url><loc>${DOMAIN}/</loc></url>
+        ${items}
+      </urlset>`;
+
+      return new Response(xml, {
+        headers: { "content-type": "application/xml" },
+      });
+    }
+
+    // ======================
+    // HOMEPAGE AMP + PAGINATION
     // ======================
     if (!slug) {
 
@@ -37,7 +62,10 @@ export async function onRequest(context) {
       let items = "";
 
       paginated.forEach(item => {
-        let s = (item.slug || item.id || "").toString().toLowerCase().replace(/\s+/g, "-");
+        let s = (item.slug || item.id || "")
+          .toString()
+          .toLowerCase()
+          .replace(/\s+/g, "-");
 
         const title = item.title || "Artikel";
         const desc = (item.meta_description || "").substring(0, 100);
@@ -71,7 +99,6 @@ export async function onRequest(context) {
       }
       pagination += `</div>`;
 
-      // JSON-LD HOMEPAGE
       const jsonLd = {
         "@context": "https://schema.org",
         "@type": "CollectionPage",
@@ -87,9 +114,9 @@ export async function onRequest(context) {
   <title>Blog AMP - Page ${page}</title>
 
   <link rel="canonical" href="${DOMAIN}/?page=${page}">
-  <meta name="viewport" content="width=device-width,minimum-scale=1">
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
 
-  <!-- SEO -->
+  <meta name="viewport" content="width=device-width,minimum-scale=1">
   <meta name="description" content="Kumpulan artikel terbaru halaman ${page}">
   <meta name="robots" content="index, follow">
 
@@ -102,14 +129,8 @@ export async function onRequest(context) {
   <!-- AMP -->
   <script async src="https://cdn.ampproject.org/v0.js"></script>
 
-  <style amp-boilerplate>
-    body{visibility:hidden}
-  </style>
-  <noscript>
-    <style amp-boilerplate>
-      body{visibility:visible}
-    </style>
-  </noscript>
+  <style amp-boilerplate>body{visibility:hidden}</style>
+  <noscript><style amp-boilerplate>body{visibility:visible}</style></noscript>
 
   <style amp-custom>
     body{font-family:sans-serif;background:#f5f5f5;padding:10px;}
@@ -119,7 +140,6 @@ export async function onRequest(context) {
     .pagination{text-align:center;margin-top:20px;}
   </style>
 
-  <!-- JSON-LD -->
   <script type="application/ld+json">
     ${JSON.stringify(jsonLd)}
   </script>
@@ -143,10 +163,13 @@ ${pagination}
     }
 
     // ======================
-    // ARTIKEL AMP + SEO FULL
+    // ARTIKEL AMP
     // ======================
     const artikel = data.find(item => {
-      let s = (item.slug || item.id || "").toString().toLowerCase().replace(/\s+/g, "-");
+      let s = (item.slug || item.id || "")
+        .toString()
+        .toLowerCase()
+        .replace(/\s+/g, "-");
       return s === slug;
     });
 
@@ -162,9 +185,8 @@ ${pagination}
       ? artikel.image
       : "/default.png";
 
-    const fullUrl = `${DOMAIN}/artikel/${slug}`;
+    const fullUrl = `https://acc.injector.workers.dev/artikel/${slug}`;
 
-    // JSON-LD ARTICLE
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "Article",
@@ -189,10 +211,10 @@ ${pagination}
   <meta charset="utf-8">
   <title>${title}</title>
 
-  <link rel="canonical" href="https://acc.injector.workers.dev/artikel/${slug}">
-  <meta name="viewport" content="width=device-width,minimum-scale=1">
+  <link rel="canonical" href="${fullUrl}">
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
 
-  <!-- SEO -->
+  <meta name="viewport" content="width=device-width,minimum-scale=1">
   <meta name="description" content="${desc}">
   <meta name="robots" content="index, follow">
 
@@ -211,14 +233,8 @@ ${pagination}
   <!-- AMP -->
   <script async src="https://cdn.ampproject.org/v0.js"></script>
 
-  <style amp-boilerplate>
-    body{visibility:hidden}
-  </style>
-  <noscript>
-    <style amp-boilerplate>
-      body{visibility:visible}
-    </style>
-  </noscript>
+  <style amp-boilerplate>body{visibility:hidden}</style>
+  <noscript><style amp-boilerplate>body{visibility:visible}</style></noscript>
 
   <style amp-custom>
     body{font-family:sans-serif;padding:15px;}
@@ -226,7 +242,6 @@ ${pagination}
     p{line-height:1.6;}
   </style>
 
-  <!-- JSON-LD -->
   <script type="application/ld+json">
     ${JSON.stringify(jsonLd)}
   </script>
@@ -248,9 +263,7 @@ ${pagination}
 
 ${content}
 
-<br><a href="https://acc.injector.workers.dev/artikel/${slug}">
-Versi Normal
-</a>
+<br><a href="${fullUrl}">Versi Normal</a>
 
 </body>
 </html>
