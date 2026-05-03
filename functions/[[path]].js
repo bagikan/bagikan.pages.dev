@@ -27,7 +27,7 @@ export async function onRequest(context) {
     }
 
     // ======================
-    // HOMEPAGE AMP (PAGINATION)
+    // HOMEPAGE AMP + META
     // ======================
     if (!slug) {
 
@@ -63,7 +63,6 @@ export async function onRequest(context) {
         `;
       });
 
-      // pagination
       const totalPages = Math.ceil(data.length / perPage);
 
       let pagination = `<div class="pagination">`;
@@ -71,6 +70,14 @@ export async function onRequest(context) {
         pagination += `<a href="/?page=${i}" ${i === page ? 'style="font-weight:bold"' : ''}>${i}</a>`;
       }
       pagination += `</div>`;
+
+      // JSON-LD HOMEPAGE
+      const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": "Blog AMP",
+        "url": `${DOMAIN}/?page=${page}`
+      };
 
       return new Response(`
 <!doctype html>
@@ -82,6 +89,17 @@ export async function onRequest(context) {
   <link rel="canonical" href="${DOMAIN}/?page=${page}">
   <meta name="viewport" content="width=device-width,minimum-scale=1">
 
+  <!-- SEO -->
+  <meta name="description" content="Kumpulan artikel terbaru halaman ${page}">
+  <meta name="robots" content="index, follow">
+
+  <!-- OG -->
+  <meta property="og:title" content="Blog AMP - Page ${page}">
+  <meta property="og:description" content="Kumpulan artikel terbaru halaman ${page}">
+  <meta property="og:url" content="${DOMAIN}/?page=${page}">
+  <meta property="og:type" content="website">
+
+  <!-- AMP -->
   <script async src="https://cdn.ampproject.org/v0.js"></script>
 
   <style amp-boilerplate>
@@ -95,26 +113,16 @@ export async function onRequest(context) {
 
   <style amp-custom>
     body{font-family:sans-serif;background:#f5f5f5;padding:10px;}
-    .grid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-    }
-    .card{
-      background:#fff;
-      padding:10px;
-      border-radius:8px;
-    }
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .card{background:#fff;padding:10px;border-radius:8px;}
     h2{font-size:16px;}
-    .pagination{
-      margin-top:20px;
-      text-align:center;
-    }
-    .pagination a{
-      margin:5px;
-      text-decoration:none;
-    }
+    .pagination{text-align:center;margin-top:20px;}
   </style>
+
+  <!-- JSON-LD -->
+  <script type="application/ld+json">
+    ${JSON.stringify(jsonLd)}
+  </script>
 </head>
 
 <body>
@@ -135,7 +143,7 @@ ${pagination}
     }
 
     // ======================
-    // ARTIKEL AMP
+    // ARTIKEL AMP + SEO FULL
     // ======================
     const artikel = data.find(item => {
       let s = (item.slug || item.id || "").toString().toLowerCase().replace(/\s+/g, "-");
@@ -154,6 +162,26 @@ ${pagination}
       ? artikel.image
       : "/default.png";
 
+    const fullUrl = `${DOMAIN}/artikel/${slug}`;
+
+    // JSON-LD ARTICLE
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": title,
+      "description": desc,
+      "image": image,
+      "mainEntityOfPage": fullUrl,
+      "author": {
+        "@type": "Person",
+        "name": "Admin"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Website Kamu"
+      }
+    };
+
     return new Response(`
 <!doctype html>
 <html amp>
@@ -164,6 +192,23 @@ ${pagination}
   <link rel="canonical" href="https://acc.injector.workers.dev/artikel/${slug}">
   <meta name="viewport" content="width=device-width,minimum-scale=1">
 
+  <!-- SEO -->
+  <meta name="description" content="${desc}">
+  <meta name="robots" content="index, follow">
+
+  <!-- OG -->
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${desc}">
+  <meta property="og:image" content="${image}">
+  <meta property="og:type" content="article">
+
+  <!-- TWITTER -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${desc}">
+  <meta name="twitter:image" content="${image}">
+
+  <!-- AMP -->
   <script async src="https://cdn.ampproject.org/v0.js"></script>
 
   <style amp-boilerplate>
@@ -180,6 +225,11 @@ ${pagination}
     h1{font-size:22px;}
     p{line-height:1.6;}
   </style>
+
+  <!-- JSON-LD -->
+  <script type="application/ld+json">
+    ${JSON.stringify(jsonLd)}
+  </script>
 </head>
 
 <body>
