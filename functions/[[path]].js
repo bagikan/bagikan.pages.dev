@@ -10,41 +10,9 @@ export async function onRequest(context) {
     const match = path.match(/^\/artikel\/(.+)$/);
     const slug = match ? match[1] : null;
 
-// ======================
-// 🗺️ SITEMAP.XML
-// ======================
-if (path === "/sitemap.xml") {
-  const items = data.map(item => {
-    const s = item.slug || item.id;
-    const loc = `${DOMAIN}/artikel/${s}`;
-
-    return `
-      <url>
-        <loc>${loc}</loc>
-        <changefreq>daily</changefreq>
-        <priority>0.8</priority>
-      </url>
-    `;
-  }).join("");
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-    <url>
-      <loc>${DOMAIN}/</loc>
-      <changefreq>daily</changefreq>
-      <priority>1.0</priority>
-    </url>
-    ${items}
-  </urlset>`;
-
-  return new Response(xml, {
-    headers: { "content-type": "application/xml" },
-  });
-}
-
-
-
-    // fetch data
+    // ======================
+    // 🔥 FETCH DATA (WAJIB DI ATAS)
+    // ======================
     const res = await fetch(API_URL);
     const text = await res.text();
 
@@ -56,7 +24,37 @@ if (path === "/sitemap.xml") {
     }
 
     // ======================
-    // HOMEPAGE
+    // 🗺️ SITEMAP.XML
+    // ======================
+    if (path === "/sitemap.xml") {
+      const items = data.map(item => {
+        const s = item.slug || item.id;
+        return `
+          <url>
+            <loc>${DOMAIN}/artikel/${s}</loc>
+            <changefreq>daily</changefreq>
+            <priority>0.8</priority>
+          </url>
+        `;
+      }).join("");
+
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <url>
+          <loc>${DOMAIN}/</loc>
+          <changefreq>daily</changefreq>
+          <priority>1.0</priority>
+        </url>
+        ${items}
+      </urlset>`;
+
+      return new Response(xml, {
+        headers: { "content-type": "application/xml" },
+      });
+    }
+
+    // ======================
+    // 🏠 HOMEPAGE
     // ======================
     if (!slug) {
       let html = `<h1>Daftar Artikel</h1><ul>`;
@@ -69,12 +67,12 @@ if (path === "/sitemap.xml") {
       html += `</ul>`;
 
       return new Response(html, {
-        headers: { "content-type": "text/html" },
+        headers: { "content-type": "text/html;charset=UTF-8" },
       });
     }
 
     // ======================
-    // CARI ARTIKEL
+    // 🔍 CARI ARTIKEL
     // ======================
     const artikel = data.find(item =>
       (item.slug && item.slug == slug) ||
@@ -85,21 +83,33 @@ if (path === "/sitemap.xml") {
       return new Response("Not found", { status: 404 });
     }
 
+    // ======================
+    // 🔥 DATA
+    // ======================
     const title = artikel.title || "Artikel";
     const content = artikel.content || "";
-    const desc = artikel.meta_description || content.substring(0, 140);
+    const desc = artikel.meta_description || content.substring(0, 150);
     const image = artikel.image || "https://via.placeholder.com/1200x630";
-
     const fullUrl = `${DOMAIN}/artikel/${slug}`;
 
+    // ======================
+    // 🔥 JSON-LD
+    // ======================
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "Article",
       "headline": title,
       "description": desc,
-      "image": image
+      "image": image,
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": fullUrl
+      }
     };
 
+    // ======================
+    // 🌐 OUTPUT HTML
+    // ======================
     return new Response(`
       <html>
       <head>
@@ -108,11 +118,14 @@ if (path === "/sitemap.xml") {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="${desc}">
+        <meta name="robots" content="index, follow">
         <link rel="canonical" href="${fullUrl}">
 
-        <!-- OG -->
+        <!-- OPEN GRAPH -->
+        <meta property="og:type" content="article">
         <meta property="og:title" content="${title}">
         <meta property="og:description" content="${desc}">
+        <meta property="og:url" content="${fullUrl}">
         <meta property="og:image" content="${image}">
 
         <!-- JSON-LD -->
@@ -124,11 +137,11 @@ if (path === "/sitemap.xml") {
       <body>
         <h1>${title}</h1>
         <p>${content}</p>
-        <a href="/">← Kembali</a>
+        <br><a href="/">← Kembali</a>
       </body>
       </html>
     `, {
-      headers: { "content-type": "text/html" },
+      headers: { "content-type": "text/html;charset=UTF-8" },
     });
 
   } catch (err) {
