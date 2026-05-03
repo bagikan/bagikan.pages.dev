@@ -27,29 +27,45 @@ export async function onRequest(context) {
     }
 
     // ======================
-    // SITEMAP
+    // SITEMAP (FULL SEO)
     // ======================
     if (path === "/sitemap.xml") {
+
+      const today = new Date().toISOString();
+
       const items = data.map(item => {
         let s = (item.slug || item.id || "")
           .toString()
           .toLowerCase()
           .replace(/\s+/g, "-");
 
-        return `<url><loc>${DOMAIN}/artikel/${s}</loc></url>`;
+        return `
+          <url>
+            <loc>${DOMAIN}/artikel/${s}</loc>
+            <lastmod>${today}</lastmod>
+            <changefreq>daily</changefreq>
+            <priority>0.8</priority>
+          </url>
+        `;
       }).join("");
 
-      return new Response(`<?xml version="1.0" encoding="UTF-8"?>
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
       <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-        <url><loc>${DOMAIN}/</loc></url>
+        <url>
+          <loc>${DOMAIN}/</loc>
+          <lastmod>${today}</lastmod>
+          <priority>1.0</priority>
+        </url>
         ${items}
-      </urlset>`, {
+      </urlset>`;
+
+      return new Response(xml, {
         headers: { "content-type": "application/xml" },
       });
     }
 
     // ======================
-    // HOMEPAGE (GRID + PAGINATION)
+    // HOMEPAGE
     // ======================
     if (!slug) {
 
@@ -88,6 +104,14 @@ export async function onRequest(context) {
       }
       pagination += `</div>`;
 
+      // JSON-LD WEBSITE
+      const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Website Kamu",
+        "url": DOMAIN
+      };
+
       return new Response(`
       <html>
       <head>
@@ -96,33 +120,37 @@ export async function onRequest(context) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+        <!-- SEO -->
         <meta name="description" content="Kumpulan artikel terbaru halaman ${page}">
-        <meta name="robots" content="index, follow">
+        <meta name="robots" content="index, follow, max-image-preview:large">
+        <meta name="googlebot" content="index, follow">
 
         <link rel="canonical" href="https://acc.injector.workers.dev/?page=${page}">
         <link rel="sitemap" href="/sitemap.xml">
 
         <!-- OG -->
+        <meta property="og:type" content="website">
         <meta property="og:title" content="Blog Artikel - Page ${page}">
         <meta property="og:description" content="Kumpulan artikel terbaru halaman ${page}">
-        <meta property="og:type" content="website">
+        <meta property="og:url" content="${DOMAIN}/?page=${page}">
+        <meta property="og:site_name" content="Website Kamu">
+
+        <!-- TWITTER -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Blog Artikel - Page ${page}">
+        <meta name="twitter:description" content="Kumpulan artikel terbaru halaman ${page}">
+
+        <!-- JSON-LD -->
+        <script type="application/ld+json">
+          ${JSON.stringify(jsonLd)}
+        </script>
 
         <style>
           body {margin:0;font-family:sans-serif;background:#f5f5f5;}
           header {background:#111;color:#fff;padding:20px;text-align:center;}
           .container {max-width:1100px;margin:auto;padding:20px;}
-          .grid {
-            display:grid;
-            grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
-            gap:20px;
-          }
-          .card {
-            background:#fff;
-            border-radius:10px;
-            padding:15px;
-            text-decoration:none;
-            color:#000;
-          }
+          .grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px;}
+          .card {background:#fff;border-radius:10px;padding:15px;text-decoration:none;color:#000;}
           .card img {width:100%;border-radius:8px;}
           .pagination {text-align:center;margin-top:20px;}
           .pagination a {margin:5px;text-decoration:none;}
@@ -167,16 +195,25 @@ export async function onRequest(context) {
       ? artikel.image
       : "/default.png";
 
-    // 🔥 tetap pakai workers sebagai canonical utama
     const fullUrl = `https://acc.injector.workers.dev/artikel/${slug}`;
 
+    // JSON-LD ARTICLE
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "Article",
       "headline": title,
       "description": desc,
       "image": image,
-      "mainEntityOfPage": fullUrl
+      "mainEntityOfPage": fullUrl,
+      "author": {
+        "@type": "Person",
+        "name": "Admin"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Website Kamu"
+      },
+      "datePublished": new Date().toISOString()
     };
 
     return new Response(`
@@ -187,19 +224,27 @@ export async function onRequest(context) {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+      <!-- SEO -->
       <meta name="description" content="${desc}">
-      <meta name="robots" content="index, follow">
+      <meta name="robots" content="index, follow, max-image-preview:large">
 
       <link rel="canonical" href="${fullUrl}">
       <link rel="sitemap" href="/sitemap.xml">
 
       <!-- OG -->
+      <meta property="og:type" content="article">
       <meta property="og:title" content="${title}">
       <meta property="og:description" content="${desc}">
       <meta property="og:image" content="${image}">
-      <meta property="og:type" content="article">
+      <meta property="og:url" content="${fullUrl}">
 
-      <!-- JSON -->
+      <!-- TWITTER -->
+      <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="${title}">
+      <meta name="twitter:description" content="${desc}">
+      <meta name="twitter:image" content="${image}">
+
+      <!-- JSON-LD -->
       <script type="application/ld+json">
         ${JSON.stringify(jsonLd)}
       </script>
