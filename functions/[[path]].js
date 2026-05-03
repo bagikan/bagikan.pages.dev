@@ -60,8 +60,14 @@ export async function onRequest(context) {
         const title = item.title || "Artikel";
         const desc = (item.meta_description || "").substring(0, 120);
 
+        // IMAGE FIX
+        const image = item.image && item.image.trim() !== ""
+          ? item.image
+          : "/default.png";
+
         cards += `
           <a href="/artikel/${s}" class="card">
+            <img src="${image}" alt="${title}" loading="lazy">
             <h2>${title}</h2>
             <p>${desc}</p>
           </a>
@@ -94,6 +100,13 @@ export async function onRequest(context) {
             text-decoration:none;
             color:#000;
             box-shadow:0 5px 15px rgba(0,0,0,0.05);
+          }
+          .card img {
+            width:100%;
+            height:150px;
+            object-fit:cover;
+            border-radius:8px;
+            margin-bottom:10px;
           }
         </style>
       </head>
@@ -136,9 +149,11 @@ export async function onRequest(context) {
 
     const fullUrl = `${DOMAIN}/artikel/${slug}`;
 
-    // ======================
+    const image = artikel.image && artikel.image.trim() !== ""
+      ? artikel.image
+      : "/default.png";
+
     // RELATED
-    // ======================
     let related = "<h3>Artikel Terkait</h3><ul>";
 
     data.slice(0,5).forEach(item => {
@@ -151,14 +166,13 @@ export async function onRequest(context) {
 
     related += "</ul>";
 
-    // ======================
     // JSON-LD
-    // ======================
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "Article",
       "headline": title,
       "description": desc,
+      "image": image,
       "mainEntityOfPage": fullUrl,
       "author": {
         "@type": "Person",
@@ -182,30 +196,33 @@ export async function onRequest(context) {
       <meta name="robots" content="index, follow">
       <link rel="canonical" href="${fullUrl}">
 
-      <!-- OPEN GRAPH -->
+      <!-- OG -->
       <meta property="og:title" content="${title}">
       <meta property="og:description" content="${desc}">
+      <meta property="og:image" content="${image}">
       <meta property="og:url" content="${fullUrl}">
       <meta property="og:type" content="article">
 
       <!-- TWITTER -->
-      <meta name="twitter:card" content="summary">
+      <meta name="twitter:card" content="summary_large_image">
       <meta name="twitter:title" content="${title}">
       <meta name="twitter:description" content="${desc}">
+      <meta name="twitter:image" content="${image}">
 
-      <!-- JSON-LD -->
+      <!-- JSON -->
       <script type="application/ld+json">
         ${JSON.stringify(jsonLd)}
       </script>
 
       <style>
         body {font-family:sans-serif;max-width:800px;margin:auto;padding:20px;}
-        h1 {font-size:28px;}
-        p {line-height:1.6;}
+        img {width:100%;border-radius:10px;margin-bottom:15px;}
       </style>
     </head>
 
     <body>
+      <img src="${image}" alt="${title}" loading="lazy">
+
       <h1>${title}</h1>
       <p><i>${desc}</i></p>
 
