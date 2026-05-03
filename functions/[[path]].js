@@ -6,9 +6,45 @@ export async function onRequest(context) {
     const API_URL = "https://script.google.com/macros/s/AKfycbxXpn0lB80LpLRaJHKBI5wgLjnyGLU-gXC3qTo-MxXBuJlHbTZ10ORuFdnDRl1LB2y5/exec";
     const DOMAIN = url.origin;
 
+    // ambil slug
     const match = path.match(/^\/artikel\/(.+)$/);
     const slug = match ? match[1] : null;
 
+// ======================
+// 🗺️ SITEMAP.XML
+// ======================
+if (path === "/sitemap.xml") {
+  const items = data.map(item => {
+    const s = item.slug || item.id;
+    const loc = `${DOMAIN}/artikel/${s}`;
+
+    return `
+      <url>
+        <loc>${loc}</loc>
+        <changefreq>daily</changefreq>
+        <priority>0.8</priority>
+      </url>
+    `;
+  }).join("");
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+      <loc>${DOMAIN}/</loc>
+      <changefreq>daily</changefreq>
+      <priority>1.0</priority>
+    </url>
+    ${items}
+  </urlset>`;
+
+  return new Response(xml, {
+    headers: { "content-type": "application/xml" },
+  });
+}
+
+
+
+    // fetch data
     const res = await fetch(API_URL);
     const text = await res.text();
 
@@ -51,30 +87,17 @@ export async function onRequest(context) {
 
     const title = artikel.title || "Artikel";
     const content = artikel.content || "";
-    const desc = artikel.meta_description || content.substring(0, 150);
+    const desc = artikel.meta_description || content.substring(0, 140);
     const image = artikel.image || "https://via.placeholder.com/1200x630";
-    const author = artikel.author || "Admin";
-    const date = artikel.date || new Date().toISOString();
 
     const fullUrl = `${DOMAIN}/artikel/${slug}`;
 
-    // 🔥 JSON-LD LEBIH KOMPLIT
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "Article",
       "headline": title,
       "description": desc,
-      "image": [image],
-      "author": {
-        "@type": "Person",
-        "name": author
-      },
-      "datePublished": date,
-      "dateModified": date,
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": fullUrl
-      }
+      "image": image
     };
 
     return new Response(`
@@ -82,30 +105,15 @@ export async function onRequest(context) {
       <head>
         <title>${title}</title>
 
-        <!-- BASIC -->
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="${desc}">
-        <meta name="robots" content="index, follow">
         <link rel="canonical" href="${fullUrl}">
 
-        <!-- OPEN GRAPH -->
-        <meta property="og:type" content="article">
+        <!-- OG -->
         <meta property="og:title" content="${title}">
         <meta property="og:description" content="${desc}">
-        <meta property="og:url" content="${fullUrl}">
         <meta property="og:image" content="${image}">
-        <meta property="og:site_name" content="Website Kamu">
-
-        <!-- TWITTER -->
-        <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="${title}">
-        <meta name="twitter:description" content="${desc}">
-        <meta name="twitter:image" content="${image}">
-
-        <!-- EXTRA -->
-        <meta name="author" content="${author}">
-        <meta name="theme-color" content="#ffffff">
 
         <!-- JSON-LD -->
         <script type="application/ld+json">
@@ -120,7 +128,7 @@ export async function onRequest(context) {
       </body>
       </html>
     `, {
-      headers: { "content-type": "text/html;charset=UTF-8" },
+      headers: { "content-type": "text/html" },
     });
 
   } catch (err) {
